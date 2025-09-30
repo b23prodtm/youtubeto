@@ -1,76 +1,112 @@
 name: Download & Release Youtube Playlists
 
 on:
+  pull_request:
   push:
     tags:
       - "*.*.*"
-
+  workflow_dispatch:
 jobs:
 
-  build:
-    name: Build
-    runs-on: ubuntu-latest
+  pre-build-self-hosted:
+    name: Self-Hosted runner
+    runs-on: [ self-hosted, Linux ]
+    if:  vars.RUNNER == 'self-hosted'
     steps:
 
+      - name: Install PIGZ
+        run: |
+          sudo zypper update -y
+          sudo zypper install -y pigz
+
+      - name: Install FFMEG
+        run: |
+          sudo zypper install -y ffmpeg-4
+
+      - name: Install Python
+        run: |
+          sudo zypper install -y python3
+
+  pre-build:
+    name: Github Hosted runner
+    runs-on: ubuntu-latest
+    if:  vars.RUNNER == 'ubuntu-latest'
+    steps:
+      - name: Install PIGZ
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y pigz
+          
+      - name: Install FFMEG
+        run: |
+          sudo apt-get install -y ffmpeg
+          
+      - name: Install Python
+        run: |
+          sudo apt-get install -y python3
+          
+  build:
+    name: Build Release
+    runs-on:  ${{ vars.RUNNER }}
+    steps:
       - name: Set up Go 1.x
-        uses: actions/checkout@v4
         uses: actions/setup-go@v5
         with:
           go-version: '>=1.17.0'
 
-
-      - name: Install PIGZ
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install pigz -y
-
-      - name: Install FFMEG
-        run: |
-          sudo apt-get install ffmpeg -y
-
-      - name: Install FFMEG
-        run: |
-          sudo apt-get install python3
-
-
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+        
       - name: Get youtube-dl
         run: |
           sudo pip3 install --upgrade --force-reinstall "git+https://github.com/ytdl-org/youtube-dl.git"
-      
+          
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+          
       - name: Go Build
-        run: go build -o main -v .
-
-
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+          go build -o main -v .
+    
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
+          tag_name:  ${{ github.ref_name  }}
           body_path: ./resource/playlist-list.csv
-          release_name: New Youtube Playlist ${{ github.ref }}
+          release_name: New Youtube Playlist ${{ github.ref_name  }}
           draft: false
           prerelease: false
-
 
       - name: Go Run
         run: |
           ./main
-
+          
       - name: Upload Release Assets
         uses: shogo82148/actions-upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./*.tar.gz
-
+          
+  update:
+    name: Update repository from Tagged Commit
+    runs-on: ${{ vars.RUNNER }}
+    if: github.ref_type == 'tag'
+    steps:    
+          
       - name: Commit Removed Lines From List Of Playlist
         uses: EndBug/add-and-commit@v5
         with:
           author_name: AutoBot
           author_email: hi@mrturkmen.com
           message: "[automated msg]: playlist doc updated with new release"
-          branch: master
+          branch: ${{ github.ref  }}
           add: "resource/*.csv"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

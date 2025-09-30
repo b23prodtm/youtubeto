@@ -49,7 +49,8 @@ jobs:
         run: |
           git config --global --add safe.directory "$(pwd)"
           go build -o main -v .
-
+          git tag "$(date '+%Y%m%d.%H%M%S')"
+          
       - name: Create Release
         id: create_release
         uses: actions/create-release@v1
@@ -61,7 +62,6 @@ jobs:
           release_name: New Youtube Playlist ${{ github.event.release.tag_name  }}
           draft: false
           prerelease: false
-
 
       - name: Go Run
         run: |

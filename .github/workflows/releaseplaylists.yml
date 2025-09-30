@@ -1,6 +1,7 @@
 name: Download & Release Youtube Playlists
 
 on:
+  pull_request:
   push:
     tags:
       - "*.*.*"
@@ -9,7 +10,8 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    #runs-on: ubuntu-latest
+    runs-on: self-hosted #opensuse-latest
     steps:
 
       - name: Set up Go 1.x
@@ -17,28 +19,37 @@ jobs:
         with:
           go-version: '>=1.17.0'
 
-
       - name: Install PIGZ
         run: |
-          sudo apt-get update -y
-          sudo apt-get install pigz -y
+          #sudo apt-get update -y
+          #sudo apt-get install -y pigz
+          sudo zypper update -y
+          sudo zypper install -y pigz
 
       - name: Install FFMEG
         run: |
-          sudo apt-get install ffmpeg -y
+          #sudo apt-get install -y ffmpeg
+          sudo zypper install -y ffmpeg-4
 
       - name: Install FFMEG
         run: |
-          sudo apt-get install python3
+          #sudo apt-get install -y python3
+          sudo zypper install -y python3
 
-
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.head_ref }}
+        
       - name: Get youtube-dl
         run: |
           sudo pip3 install --upgrade --force-reinstall "git+https://github.com/ytdl-org/youtube-dl.git"
       
       - name: Go Build
-        run: go build -o main -v .
-
+        run: |
+          git config --global --add safe.directory "$(pwd)"
+          git tag "$(date '+%Y%m%d.%H%M%S')"
+          go build -o main -v .
 
       - name: Create Release
         id: create_release
@@ -46,7 +57,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
+          tag_name:  ${{ github.ref }}
           body_path: ./resource/playlist-list.csv
           release_name: New Youtube Playlist ${{ github.ref }}
           draft: false

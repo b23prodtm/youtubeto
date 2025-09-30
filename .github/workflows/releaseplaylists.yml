@@ -48,7 +48,6 @@ jobs:
       - name: Go Build
         run: |
           git config --global --add safe.directory "$(pwd)"
-          git tag "$(date '+%Y%m%d.%H%M%S')"
           go build -o main -v .
 
       - name: Create Release
@@ -57,9 +56,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name:  ${{ github.ref }}
+          tag_name:  ${{ github.event.release.tag_name  }}
           body_path: ./resource/playlist-list.csv
-          release_name: New Youtube Playlist ${{ github.ref }}
+          release_name: New Youtube Playlist ${{ github.event.release.tag_name  }}
           draft: false
           prerelease: false
 
